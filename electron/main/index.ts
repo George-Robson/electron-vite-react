@@ -47,6 +47,7 @@ async function createWindow() {
   win = new BrowserWindow({
     title: 'Main window',
     icon: path.join(process.env.VITE_PUBLIC, 'favicon.ico'),
+    frame: false,
     webPreferences: {
       preload,
       // Warning: Enable nodeIntegration and disable contextIsolation is not secure in production
@@ -96,6 +97,7 @@ app.on('second-instance', () => {
   }
 })
 
+
 app.on('activate', () => {
   const allWindows = BrowserWindow.getAllWindows()
   if (allWindows.length) {
@@ -104,6 +106,34 @@ app.on('activate', () => {
     createWindow()
   }
 })
+
+// IPC handlers for window controls
+ipcMain.handle('window:minimize', () => {
+  win?.minimize();
+});
+ipcMain.handle('window:maximize', () => {
+  if (win?.isMaximized()) {
+    win.unmaximize();
+  } else {
+    win?.maximize();
+  }
+});
+ipcMain.handle('window:close', () => {
+  win?.close();
+});
+ipcMain.handle('window:isMaximized', () => {
+  return win?.isMaximized() ?? false;
+});
+
+// Emit maximize/unmaximize events to renderer
+app.whenReady().then(() => {
+  win?.on('maximize', () => {
+    win?.webContents.send('window:maximized');
+  });
+  win?.on('unmaximize', () => {
+    win?.webContents.send('window:unmaximized');
+  });
+});
 
 // New window example arg: new windows url
 ipcMain.handle('open-win', (_, arg) => {
