@@ -127,7 +127,7 @@ const Settings: React.FC = () => {
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 w-full h-full">
       <section className="card-ui">
         <h2 className="mb-4">Platforms</h2>
         <div className="flex flex-wrap gap-2 mb-4">
