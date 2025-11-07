@@ -1,5 +1,8 @@
 
 import Titlebar from './Titlebar';
+import SideBar from './SideBar';
+import TopBar from './TopBar';
+import React from 'react';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -7,14 +10,19 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
     return (
-        <div className="min-h-screen w-screen flex flex-col bg-background text-foreground overflow-x-hidden">
+        <div className="h-screen w-screen bg-background text-foreground overflow-hidden">
             <Titlebar />
-            <main className="flex-1 p-4">
-                {children}
-            </main>
-            <footer className="text-center text-sm w-full p-2 bg-selection text-comment">
-                © {new Date().getFullYear()} Arcana Library
-            </footer>
+            {/* Offset for titlebar (32px) + topbar (56px) = 88px => 5.5rem */}
+            <div className="h-full pt-9 overflow-hidden">
+            <TopBar />
+                <div className="h-full w-full flex">
+                    <SideBar>
+                        <div className="h-full overflow-y-auto relative">
+                            {children}
+                        </div>
+                    </SideBar>
+                </div>
+            </div>
         </div>
     );
 };

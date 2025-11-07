@@ -1,7 +1,10 @@
 import { app, BrowserWindow, shell, ipcMain } from 'electron'
+import { initDatabase, seedIfEmpty, listGames, insertGame, updateGame, deleteGame, listDistinct, listCollections, getCollectionWithGames, createCollection, addGameToCollection, removeGameFromCollection, listUsers, createUser, deleteUser, updateUserAvatar, updateUserAvatarFile, getUserAvatarData, listApiKeys, createApiKey, updateApiKey, deleteApiKey, listPlatforms, seedPlatforms, setActiveUser, getActiveUser, getMeta, setMeta, getDatabaseFilePath } from './db'
+import { startScan, cancelScan, listActiveScans } from './scanner/index';
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
 import os from 'node:os'
 import { update } from './update'
 
@@ -80,6 +83,31 @@ async function createWindow() {
 
   // Auto update
   update(win)
+
+  // Initialize / seed DB after window ready
+  initDatabase();
+
+  // JSON-based platform seeding (first run only)
+  try {
+    const seeded = getMeta('platforms_seeded');
+    const platformsFile = path.join(process.env.APP_ROOT!, 'platforms.json');
+    if (seeded !== 'true' && fs.existsSync(platformsFile)) {
+      const raw = fs.readFileSync(platformsFile, 'utf-8');
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        const names = list.filter(p => typeof p === 'string').map(p => p.trim()).filter(Boolean);
+        if (names.length) {
+          seedPlatforms(names);
+          setMeta('platforms_seeded', 'true');
+          console.log('[platforms] seeded from platforms.json');
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Failed to seed platforms from JSON:', err);
+  }
+
+  seedIfEmpty();
 }
 
 app.whenReady().then(createWindow)
@@ -124,6 +152,53 @@ ipcMain.handle('window:close', () => {
 ipcMain.handle('window:isMaximized', () => {
   return win?.isMaximized() ?? false;
 });
+
+// Database IPC channels
+ipcMain.handle('db:listGames', () => listGames());
+ipcMain.handle('db:listDistinct', (_e, column: 'platform' | 'genre') => listDistinct(column));
+ipcMain.handle('db:insertGame', (_e, game) => insertGame(game));
+ipcMain.handle('db:updateGame', (_e, game) => updateGame(game));
+ipcMain.handle('db:deleteGame', (_e, id: number) => { deleteGame(id); return true; });
+ipcMain.handle('db:listCollections', () => listCollections());
+ipcMain.handle('db:getCollection', (_e, id: number) => getCollectionWithGames(id));
+ipcMain.handle('db:createCollection', (_e, name: string) => createCollection(name));
+ipcMain.handle('db:addGameToCollection', (_e, collectionId: number, gameId: number) => { addGameToCollection(collectionId, gameId); return true; });
+ipcMain.handle('db:removeGameFromCollection', (_e, collectionId: number, gameId: number) => { removeGameFromCollection(collectionId, gameId); return true; });
+// Users
+ipcMain.handle('db:listUsers', () => listUsers());
+ipcMain.handle('db:createUser', (_e, name: string) => createUser(name));
+ipcMain.handle('db:deleteUser', (_e, id: number) => { deleteUser(id); return true; });
+ipcMain.handle('db:updateUserAvatar', (_e, id: number, avatar: string | null) => updateUserAvatar(id, avatar));
+ipcMain.handle('db:updateUserAvatarFile', (_e, id: number, dataUrl: string | null) => updateUserAvatarFile(id, dataUrl));
+ipcMain.handle('db:getUserAvatarData', (_e, id: number) => getUserAvatarData(id));
+// API Keys
+ipcMain.handle('db:listApiKeys', (_e, userId?: number) => listApiKeys(userId));
+ipcMain.handle('db:createApiKey', (_e, params) => createApiKey(params));
+ipcMain.handle('db:updateApiKey', (_e, params) => updateApiKey(params));
+ipcMain.handle('db:deleteApiKey', (_e, id: number) => { deleteApiKey(id); return true; });
+// Platforms & meta
+ipcMain.handle('db:listPlatforms', () => listPlatforms());
+ipcMain.handle('db:seedPlatforms', (_e, names: string[]) => { seedPlatforms(names); return listPlatforms(); });
+ipcMain.handle('db:setActiveUser', (_e, id: number) => { 
+  const prev = getActiveUser();
+  setActiveUser(id); 
+  const current = getActiveUser();
+  if (win && (!prev || prev.id !== id)) {
+    win.webContents.send('active-user-changed', current);
+  }
+  return true; 
+});
+ipcMain.handle('db:getActiveUser', () => getActiveUser());
+ipcMain.handle('db:getPath', () => getDatabaseFilePath());
+
+// Scanning IPC
+ipcMain.handle('scan:start', (_e, platform: string) => {
+  return startScan(win, platform);
+});
+ipcMain.handle('scan:cancel', (_e, id: string) => {
+  return cancelScan(id);
+});
+ipcMain.handle('scan:list', () => listActiveScans());
 
 // Emit maximize/unmaximize events to renderer
 app.whenReady().then(() => {

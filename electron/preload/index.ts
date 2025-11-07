@@ -26,6 +26,55 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const [channel, ...omit] = args;
     return ipcRenderer.invoke(channel, ...omit);
   },
+  db: {
+    listGames: () => ipcRenderer.invoke('db:listGames'),
+    listDistinct: (column: 'platform' | 'genre') => ipcRenderer.invoke('db:listDistinct', column),
+    insertGame: (game: { title: string; platform: string; genre: string; collection?: string | null }) => ipcRenderer.invoke('db:insertGame', game),
+    updateGame: (game: { id: number; title: string; platform: string; genre: string; collection?: string | null }) => ipcRenderer.invoke('db:updateGame', game),
+    deleteGame: (id: number) => ipcRenderer.invoke('db:deleteGame', id),
+    listCollections: () => ipcRenderer.invoke('db:listCollections'),
+    getCollection: (id: number) => ipcRenderer.invoke('db:getCollection', id),
+    createCollection: (name: string) => ipcRenderer.invoke('db:createCollection', name),
+    addGameToCollection: (collectionId: number, gameId: number) => ipcRenderer.invoke('db:addGameToCollection', collectionId, gameId),
+    removeGameFromCollection: (collectionId: number, gameId: number) => ipcRenderer.invoke('db:removeGameFromCollection', collectionId, gameId),
+    // Users
+    listUsers: () => ipcRenderer.invoke('db:listUsers'),
+    createUser: (name: string) => ipcRenderer.invoke('db:createUser', name),
+    deleteUser: (id: number) => ipcRenderer.invoke('db:deleteUser', id),
+  updateUserAvatar: (id: number, avatar: string | null) => ipcRenderer.invoke('db:updateUserAvatar', id, avatar),
+  updateUserAvatarFile: (id: number, dataUrl: string | null) => ipcRenderer.invoke('db:updateUserAvatarFile', id, dataUrl),
+  getUserAvatarData: (id: number) => ipcRenderer.invoke('db:getUserAvatarData', id),
+    // API Keys
+    listApiKeys: (userId?: number) => ipcRenderer.invoke('db:listApiKeys', userId),
+    createApiKey: (params: { user: string | number; platform: string; key: string; client_id?: string }) => ipcRenderer.invoke('db:createApiKey', params),
+    updateApiKey: (params: { id: number; key?: string; client_id?: string }) => ipcRenderer.invoke('db:updateApiKey', params),
+    deleteApiKey: (id: number) => ipcRenderer.invoke('db:deleteApiKey', id),
+    listPlatforms: () => ipcRenderer.invoke('db:listPlatforms'),
+    seedPlatforms: (names: string[]) => ipcRenderer.invoke('db:seedPlatforms', names),
+    setActiveUser: (id: number) => ipcRenderer.invoke('db:setActiveUser', id),
+    onActiveUserChanged: (callback: (user: any) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, user: any) => callback(user);
+      ipcRenderer.on('active-user-changed', listener);
+      return () => ipcRenderer.off('active-user-changed', listener);
+    },
+    getActiveUser: () => ipcRenderer.invoke('db:getActiveUser'),
+    getPath: () => ipcRenderer.invoke('db:getPath'),
+  }
+  , scan: {
+    start: (platform: string) => ipcRenderer.invoke('scan:start', platform),
+    cancel: (id: string) => ipcRenderer.invoke('scan:cancel', id),
+    list: () => ipcRenderer.invoke('scan:list'),
+    onProgress: (cb: (p: any) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, data: any) => cb(data);
+      ipcRenderer.on('scan-progress', listener);
+      return () => ipcRenderer.off('scan-progress', listener);
+    },
+    onComplete: (cb: (r: any) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, data: any) => cb(data);
+      ipcRenderer.on('scan-complete', listener);
+      return () => ipcRenderer.off('scan-complete', listener);
+    }
+  }
 });
 
 // --------- Preload scripts loading ---------
